@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import { useAuth } from './main';
 
+
 export default function App() {
   const { isAuthenticated } = useAuth();
 

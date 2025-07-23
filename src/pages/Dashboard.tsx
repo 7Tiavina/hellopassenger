@@ -1,8 +1,10 @@
 // src/pages/Dashboard.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../main';
 import { TopNavbar, SidebarMenu } from '../components/layout/LayoutComponents';
 import ReservationForm, { type ReservationData } from '../components/reservations/ReservationForm';
+import ReservationList from '../components/reservations/ReservationList';
+
 import {
   HistorySection,
   ProfileSection,
@@ -28,11 +30,21 @@ export default function Dashboard() {
 
   // 2️⃣ Ajout d’une réservation + mise à jour du localStorage
   const handleComplete = (data: ReservationData) => {
-    const updated = [...reservations, data];
-    setReservations(updated);
-    localStorage.setItem('reservations', JSON.stringify(updated));
-    setShowForm(false);
-  };
+  //  Crée une ref unique
+  const newRef = `CNG-${Date.now()}`
+
+  //  Ajoute cette ref au data
+  const withRef: ReservationData = { ...data, ref: newRef }
+
+  //  Met à jour le tableau et le localStorage
+  const updated = [...reservations, withRef]
+  setReservations(updated)
+  localStorage.setItem('reservations', JSON.stringify(updated))
+
+  //  Ferme le formulaire
+  setShowForm(false)
+}
+
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -59,29 +71,9 @@ export default function Dashboard() {
 
                   {/* Tableau persistant */}
                   {reservations.length > 0 && (
-                    <table className="min-w-full mt-6 border">
-                      <thead className="bg-[#ada7bb] text-[#2c2c2c]">
-                        <tr>
-                          <th className="px-4 py-2 border">Départ</th>
-                          <th className="px-4 py-2 border">Arrivée</th>
-                          <th className="px-4 py-2 border">Collecte</th>
-                          <th className="px-4 py-2 border">Livraison</th>
-                          <th className="px-4 py-2 border">Statut</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {reservations.map((r, i) => (
-                          <tr key={i} className="odd:bg-white even:bg-gray-100">
-                            <td className="px-4 py-2 border">{r.departure}</td>
-                            <td className="px-4 py-2 border">{r.arrival}</td>
-                            <td className="px-4 py-2 border">{r.collectDate}</td>
-                            <td className="px-4 py-2 border">{r.deliverDate}</td>
-                            <td className="px-4 py-2 border">{r.status}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <ReservationList reservations={reservations} />
                   )}
+
                 </>
               ) : (
                 /* On passe handleComplete : formulaire inchangé */

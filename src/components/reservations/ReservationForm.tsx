@@ -1,5 +1,6 @@
 // src/components/reservations/ReservationForm.tsx
-import React, { useState } from 'react';
+import React, { useState } from 'react'
+import { QRCodeCanvas } from 'qrcode.react'
 
 // 1️⃣ Type exporté pour Dashboard.tsx
 export type ReservationData = {
@@ -7,43 +8,44 @@ export type ReservationData = {
   arrival: string;
   collectDate: string;
   deliverDate: string;
-  status: string; // ex: “En cours”, “Terminé”
+  status: string;         // ex: “En cours”, “Terminé”
+  ref?: string;           // ← ajouté pour identifier chaque réservation
 };
 
 type Props = {
-  onComplete: (data: ReservationData) => void;
-};
+  onComplete: (data: ReservationData) => void
+}
 
 export default function ReservationForm({ onComplete }: Props) {
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
+  const [showQR, setShowQR] = useState(false)                // ← placé ici
 
   // Données du formulaire
-  const [departure, setDeparture] = useState('TNR');
-  const [arrival, setArrival] = useState('CDG');
-  const [collectDate, setCollectDate] = useState('');
-  const [deliverDate, setDeliverDate] = useState('');
+  const [departure, setDeparture] = useState('TNR')
+  const [arrival, setArrival] = useState('CDG')
+  const [collectDate, setCollectDate] = useState('')
+  const [deliverDate, setDeliverDate] = useState('')
   const [baggages, setBaggages] = useState<
     { type: string; dims: string; weight: number; fragile: boolean; insured: boolean }[]
-  >([]);
-  const [status] = useState('En cours');
+  >([])
+  const [status] = useState('En cours')
 
-  const progress = (step - 1) * 25;
-  const next = () => setStep((s) => (s < 5 ? (s + 1) as any : s));
-  const back = () => setStep((s) => (s > 1 ? (s - 1) as any : s));
+  // Progression et navigation
+  const progress = (step - 1) * 25
+  const next = () => setStep((s) => (s < 5 ? (s + 1) as any : s))
+  const back = () => setStep((s) => (s > 1 ? (s - 1) as any : s))
 
-  // Pour ajouter dynamiquement un bagage
+  // Gestion des bagages
   const addBaggage = () => {
-    setBaggages((b) => [...b, { type: 'Valise', dims: '', weight: 0, fragile: false, insured: false }]);
-  };
+    setBaggages((b) => [...b, { type: 'Valise', dims: '', weight: 0, fragile: false, insured: false }])
+  }
   const updateBaggage = (i: number, field: string, value: any) => {
-    setBaggages((b) =>
-      b.map((bag, idx) => (idx === i ? { ...bag, [field]: value } : bag))
-    );
-  };
+    setBaggages((b) => b.map((bag, idx) => (idx === i ? { ...bag, [field]: value } : bag)))
+  }
 
   return (
     <div className="bg-white p-6 rounded-lg shadow max-w-3xl mx-auto">
-      {/* Progress bar */}
+      {/* Barre de progression */}
       <div className="w-full bg-gray-200 rounded-full h-2 mb-6 overflow-hidden">
         <div
           className="bg-[#2c2c2c] h-2 transition-all"
@@ -51,7 +53,7 @@ export default function ReservationForm({ onComplete }: Props) {
         />
       </div>
 
-      {/* Étape 1 : Sélection Trajet */}
+      {/* Étapes 1 à 4 (inchangées) */}
       {step === 1 && (
         <div>
           <h3 className="text-xl font-semibold mb-4">Étape 1 : Sélection Trajet</h3>
@@ -76,7 +78,6 @@ export default function ReservationForm({ onComplete }: Props) {
         </div>
       )}
 
-      {/* Étape 2 : Détails Bagages */}
       {step === 2 && (
         <div>
           <h3 className="text-xl font-semibold mb-4">Étape 2 : Détails Bagages</h3>
@@ -96,7 +97,6 @@ export default function ReservationForm({ onComplete }: Props) {
                   <option>Sac</option>
                   <option>Carton</option>
                 </select>
-
                 <label className="block mb-1">Dimensions (L x l x H)</label>
                 <input
                   type="text"
@@ -105,7 +105,6 @@ export default function ReservationForm({ onComplete }: Props) {
                   value={bag.dims}
                   onChange={(e) => updateBaggage(i, 'dims', e.target.value)}
                 />
-
                 <label className="block mb-1">Poids</label>
                 <input
                   type="range"
@@ -115,17 +114,15 @@ export default function ReservationForm({ onComplete }: Props) {
                   value={bag.weight}
                   onChange={(e) => updateBaggage(i, 'weight', Number(e.target.value))}
                 />
-
                 <label className="block mb-1">Photo</label>
                 <input type="file" className="w-full mb-3" />
-
                 <div className="flex space-x-4">
                   <label className="flex items-center">
                     <input
                       type="checkbox"
                       checked={bag.fragile}
                       onChange={(e) => updateBaggage(i, 'fragile', e.target.checked)}
-                    />{' '}
+                    />
                     Fragile
                   </label>
                   <label className="flex items-center">
@@ -133,7 +130,7 @@ export default function ReservationForm({ onComplete }: Props) {
                       type="checkbox"
                       checked={bag.insured}
                       onChange={(e) => updateBaggage(i, 'insured', e.target.checked)}
-                    />{' '}
+                    />
                     Valeur déclarée
                   </label>
                 </div>
@@ -143,7 +140,6 @@ export default function ReservationForm({ onComplete }: Props) {
         </div>
       )}
 
-      {/* Étape 3 : Créneaux Horaires */}
       {step === 3 && (
         <div>
           <h3 className="text-xl font-semibold mb-4">Étape 3 : Créneaux Horaires</h3>
@@ -164,7 +160,6 @@ export default function ReservationForm({ onComplete }: Props) {
         </div>
       )}
 
-      {/* Étape 4 : Coordonnées */}
       {step === 4 && (
         <div>
           <h3 className="text-xl font-semibold mb-4">Étape 4 : Coordonnées</h3>
@@ -186,21 +181,59 @@ export default function ReservationForm({ onComplete }: Props) {
         </div>
       )}
 
-      {/* Étape 5 : Paiement */}
+      {/* Étape 5 : Paiement + QR */}
       {step === 5 && (
         <div>
           <h3 className="text-xl font-semibold mb-4">Étape 5 : Paiement</h3>
-          <p className="mb-4">Récapitulatif détaillé ici…</p>
-          <button className="w-full bg-green-600 text-white py-2 rounded mb-2">Payer par carte (Stripe)</button>
-          <button className="w-full bg-yellow-500 text-white py-2 rounded mb-2">Mobile Money</button>
-          <button className="w-full bg-gray-700 text-white py-2 rounded">Virement</button>
-          <label className="flex items-center space-x-2 mt-4">
+          <button className="w-full bg-green-600 text-white py-2 rounded-lg mb-2">
+            Payer par carte (Stripe)
+          </button>
+          <button className="w-full bg-yellow-500 text-white py-2 rounded-lg mb-2">
+            Mobile Money
+          </button>
+          <button className="w-full bg-gray-700 text-white py-2 rounded-lg mb-4">
+            Virement
+          </button>
+          <label className="flex items-center space-x-2 mb-6">
             <input type="checkbox" /> Ajouter Assurance bagage
           </label>
+
+          {/* Bouton Terminer */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => {
+                onComplete({ departure, arrival, collectDate, deliverDate, status })
+                setShowQR(true)               // ← seul bouton Terminer
+              }}
+              className="bg-[#ffc80a] text-[#2c2c2c] px-4 py-2 rounded"
+            >
+              Terminer
+            </button>
+          </div>
+
+          {/* QR Code après validation */}
+          {showQR && (
+            <div className="flex justify-center mt-6">
+              <QRCodeCanvas
+                value={JSON.stringify({
+                  departure,
+                  arrival,
+                  collectDate,
+                  deliverDate,
+                  status,
+                })}
+                size={180}
+                bgColor="#ffffff"
+                fgColor="#2c2c2c"
+                level="H"
+                includeMargin
+              />
+            </div>
+          )}
         </div>
       )}
 
-      {/* Boutons de navigation */}
+      {/* Barre de navigation */}
       <div className="flex justify-between mt-6">
         <button
           onClick={back}
@@ -209,22 +242,15 @@ export default function ReservationForm({ onComplete }: Props) {
         >
           ← Précédent
         </button>
-        {step < 5 ? (
+        {step < 5 && (
           <button
             onClick={next}
             className="bg-[#ffc80a] text-[#2c2c2c] px-4 py-2 rounded"
           >
             Suivant →
           </button>
-        ) : (
-          <button
-            onClick={() => onComplete({ departure, arrival, collectDate, deliverDate, status })}
-            className="bg-[#ffc80a] text-[#2c2c2c] px-4 py-2 rounded"
-          >
-            Terminer
-          </button>
         )}
       </div>
     </div>
-  );
+  )
 }
