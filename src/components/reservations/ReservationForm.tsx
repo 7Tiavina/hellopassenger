@@ -4,13 +4,13 @@ import { QRCodeCanvas } from 'qrcode.react'
 
 // 1️⃣ Type exporté pour Dashboard.tsx
 export type ReservationData = {
-  departure: string;
-  arrival: string;
-  collectDate: string;
-  deliverDate: string;
-  status: string;         // ex: “En cours”, “Terminé”
-  ref?: string;           // ← ajouté pour identifier chaque réservation
-};
+  departure: string
+  arrival: string
+  collectDate: string
+  deliverDate: string
+  status: string         // ex: “En cours”, “Terminé”
+  ref?: string           // ← ajouté pour identifier chaque réservation
+}
 
 type Props = {
   onComplete: (data: ReservationData) => void
@@ -18,7 +18,8 @@ type Props = {
 
 export default function ReservationForm({ onComplete }: Props) {
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
-  const [showQR, setShowQR] = useState(false)                // ← placé ici
+  const [showQR, setShowQR] = useState(false)
+  const [reservationRef, setReservationRef] = useState<string>('') // ← nouveau
 
   // Données du formulaire
   const [departure, setDeparture] = useState('TNR')
@@ -37,10 +38,15 @@ export default function ReservationForm({ onComplete }: Props) {
 
   // Gestion des bagages
   const addBaggage = () => {
-    setBaggages((b) => [...b, { type: 'Valise', dims: '', weight: 0, fragile: false, insured: false }])
+    setBaggages((b) => [
+      ...b,
+      { type: 'Valise', dims: '', weight: 0, fragile: false, insured: false },
+    ])
   }
   const updateBaggage = (i: number, field: string, value: any) => {
-    setBaggages((b) => b.map((bag, idx) => (idx === i ? { ...bag, [field]: value } : bag)))
+    setBaggages((b) =>
+      b.map((bag, idx) => (idx === i ? { ...bag, [field]: value } : bag))
+    )
   }
 
   return (
@@ -202,8 +208,20 @@ export default function ReservationForm({ onComplete }: Props) {
           <div className="flex justify-end">
             <button
               onClick={() => {
-                onComplete({ departure, arrival, collectDate, deliverDate, status })
-                setShowQR(true)               // ← seul bouton Terminer
+               // Génération de la référence
+               const newRef = `CNG-${Date.now()}`
+               setReservationRef(newRef)
+
+               // Envoi des données avec ref
+                onComplete({
+                  departure,
+                  arrival,
+                  collectDate,
+                  deliverDate,
+                  status,
+                ref: newRef,
+                })
+                setShowQR(true)
               }}
               className="bg-[#ffc80a] text-[#2c2c2c] px-4 py-2 rounded"
             >
@@ -216,6 +234,7 @@ export default function ReservationForm({ onComplete }: Props) {
             <div className="flex justify-center mt-6">
               <QRCodeCanvas
                 value={JSON.stringify({
+                  ref: reservationRef,
                   departure,
                   arrival,
                   collectDate,
