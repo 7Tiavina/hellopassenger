@@ -1,32 +1,59 @@
 // src/components/dashboard/DashboardSections.tsx
 import React, { useState, useEffect } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
-import type { ReservationData } from '../reservations/ReservationForm'
+
+export type ReservationData = {
+  id: number
+  departure: string
+  arrival: string
+  collect_date: string
+  deliver_date: string
+  status: string
+  ref?: string
+}
 
 export function HistorySection() {
-  // 1️⃣ États
   const [reservations, setReservations] = useState<ReservationData[]>([])
   const [selected, setSelected] = useState<ReservationData | null>(null)
   const [page, setPage] = useState(1)
   const perPage = 6
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  // 2️⃣ Chargement depuis localStorage
   useEffect(() => {
-    const data = localStorage.getItem('reservations')
-    if (data) setReservations(JSON.parse(data))
+    fetch('http://localhost:8000/api/reservations')
+      .then((res) => res.json())
+      .then((json) => {
+        const list = json.data as ReservationData[]
+        const mapped = list.map((r, i) => ({
+          ...r,
+          ref: r.ref ?? `CNG-${1000 + i}`,
+          status: r.status ?? 'En cours',
+        }))
+        setReservations(mapped)
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error(err)
+        setError('Erreur lors du chargement des réservations.')
+        setLoading(false)
+      })
   }, [])
 
-  // 3️⃣ Pagination
   const totalPages = Math.ceil(reservations.length / perPage)
   const start = (page - 1) * perPage
   const paginated = reservations.slice(start, start + perPage)
 
-  // 4️⃣ Si aucune réservation
+  if (loading) {
+    return <p className="text-center text-gray-500">Chargement en cours…</p>
+  }
+  if (error) {
+    return <p className="text-center text-red-500">{error}</p>
+  }
   if (reservations.length === 0) {
     return <p className="text-center text-gray-500">Aucune réservation pour le moment.</p>
   }
 
-  // 5️⃣ Si une réservation est sélectionnée, afficher la fiche détaillée
   if (selected) {
     return (
       <div className="max-w-2xl mx-auto p-6 space-y-6">
@@ -37,17 +64,19 @@ export function HistorySection() {
           ← Retour à l'historique
         </button>
 
-        <h2 className="text-2xl font-bold">Détails de la consigne {selected.ref}</h2>
+        <h2 className="text-2xl font-bold">
+          Détails de la consigne {selected.ref}
+        </h2>
 
         <div className="space-y-2">
           <p>
             <strong>Trajet :</strong> {selected.departure} → {selected.arrival}
           </p>
           <p>
-            <strong>Collecte :</strong> {selected.collectDate}
+            <strong>Collecte :</strong> {selected.collect_date}
           </p>
           <p>
-            <strong>Livraison :</strong> {selected.deliverDate}
+            <strong>Livraison :</strong> {selected.deliver_date}
           </p>
           <p>
             <strong>Statut :</strong> {selected.status}
@@ -68,7 +97,6 @@ export function HistorySection() {
     )
   }
 
-  // 6️⃣ Sinon, afficher la liste paginée
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4">Historique de transactions</h2>
@@ -104,9 +132,11 @@ export function HistorySection() {
                 </h3>
               </div>
 
-              <p className="text-sm text-gray-600">Collecte : {r.collectDate}</p>
+              <p className="text-sm text-gray-600">
+                Collecte : {r.collect_date}
+              </p>
               <p className="text-sm text-gray-600 mb-3">
-                Livraison : {r.deliverDate}
+                Livraison : {r.deliver_date}
               </p>
 
               <span
@@ -126,7 +156,6 @@ export function HistorySection() {
         })}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center space-x-2 mt-6">
           <button
@@ -136,7 +165,6 @@ export function HistorySection() {
           >
             Précédent
           </button>
-
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
             <button
               key={n}
@@ -148,7 +176,6 @@ export function HistorySection() {
               {n}
             </button>
           ))}
-
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
