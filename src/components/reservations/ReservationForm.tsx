@@ -1,52 +1,89 @@
 // src/components/reservations/ReservationForm.tsx
 import React, { useState } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
-
-// 1️⃣ Type exporté pour Dashboard.tsx
-export type ReservationData = {
-  departure: string
-  arrival: string
-  collectDate: string
-  deliverDate: string
-  status: string         // ex: “En cours”, “Terminé”
-  ref?: string           // ← ajouté pour identifier chaque réservation
-}
+import { useNavigate } from 'react-router-dom'
 
 type Props = {
-  onComplete: (data: ReservationData) => void
+  onDone: () => void
 }
 
-export default function ReservationForm({ onComplete }: Props) {
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
-  const [showQR, setShowQR] = useState(false)
-  const [reservationRef, setReservationRef] = useState<string>('') // ← nouveau
+export default function ReservationForm({ onDone }: Props) {
+  const navigate = useNavigate()
 
-  // Données du formulaire
+  // Étapes du formulaire (1 → 5)
+  const [step, setStep] = useState<1|2|3|4|5>(1)
+  const progress = (step - 1) * 25
+
+  // Données
   const [departure, setDeparture] = useState('TNR')
   const [arrival, setArrival] = useState('CDG')
   const [collectDate, setCollectDate] = useState('')
   const [deliverDate, setDeliverDate] = useState('')
-  const [baggages, setBaggages] = useState<
-    { type: string; dims: string; weight: number; fragile: boolean; insured: boolean }[]
-  >([])
-  const [status] = useState('En cours')
+  const [status, setStatus] = useState('en_attente')
 
-  // Progression et navigation
-  const progress = (step - 1) * 25
-  const next = () => setStep((s) => (s < 5 ? (s + 1) as any : s))
-  const back = () => setStep((s) => (s > 1 ? (s - 1) as any : s))
+  // UI state
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string>('')
+  const [showQR, setShowQR] = useState(false)
+  const [reservationRef, setReservationRef] = useState<string>('')
 
-  // Gestion des bagages
-  const addBaggage = () => {
-    setBaggages((b) => [
-      ...b,
-      { type: 'Valise', dims: '', weight: 0, fragile: false, insured: false },
-    ])
-  }
-  const updateBaggage = (i: number, field: string, value: any) => {
-    setBaggages((b) =>
-      b.map((bag, idx) => (idx === i ? { ...bag, [field]: value } : bag))
-    )
+  const next = () => setStep(s => (s < 5 ? (s + 1) as any : s))
+  const back = () => setStep(s => (s > 1 ? (s - 1) as any : s))
+
+  const handleSubmit = async () => {
+    // 1️⃣ Validation client
+    if (!collectDate || !deliverDate) {
+      setError('Les dates de collecte et de livraison sont obligatoires.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch('http://localhost:8000/api/reservations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: 1,
+          departure,
+          arrival,
+          collect_date: collectDate,
+          deliver_date: deliverDate,
+          status,
+        }),
+      })
+      const json = await res.json()
+
+      // 2️⃣ Gestion erreurs 422 Laravel
+      if (res.status === 422 && json.errors) {
+        const msgs = Object.values(json.errors).flat().join(' ')
+        throw new Error(msgs)
+      }
+
+      // 3️⃣ Vérifie succès général
+      if (!json.success) {
+        throw new Error(json.message || 'Erreur interne API')
+      }
+
+      // 4️⃣ Récupère la référence renvoyée
+      const payload = (json as any).reservation ?? (json as any).data
+      if (!payload || !payload.ref) {
+        throw new Error('Réponse API invalide: pas de référence')
+      }
+      setReservationRef(payload.ref)
+      setStatus(payload.status || status)
+      setShowQR(true)
+
+      // 5️⃣ Redirection vers /dashboard
+     navigate('/dashboard?section=reservations')
+     onDone()
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || 'Impossible de créer la réservation.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -59,179 +96,79 @@ export default function ReservationForm({ onComplete }: Props) {
         />
       </div>
 
-      {/* Étapes 1 à 4 (inchangées) */}
+      {/* Étapes */}
       {step === 1 && (
-        <div>
-          <h3 className="text-xl font-semibold mb-4">Étape 1 : Sélection Trajet</h3>
-          <label className="block mb-1">Aéroport de départ</label>
+        <>
+          <h3 className="text-xl font-semibold mb-4">Étape 1 : Trajet</h3>
           <select
             className="w-full border rounded p-2 mb-4"
             value={departure}
-            onChange={(e) => setDeparture(e.target.value)}
+            onChange={e => setDeparture(e.target.value)}
           >
             <option>TNR</option>
             <option>MDG</option>
           </select>
-          <label className="block mb-1">Aéroport d’arrivée</label>
           <select
             className="w-full border rounded p-2"
             value={arrival}
-            onChange={(e) => setArrival(e.target.value)}
+            onChange={e => setArrival(e.target.value)}
           >
             <option>CDG</option>
             <option>ORY</option>
           </select>
-        </div>
+        </>
       )}
 
       {step === 2 && (
-        <div>
-          <h3 className="text-xl font-semibold mb-4">Étape 2 : Détails Bagages</h3>
-          <button onClick={addBaggage} className="mb-4 text-blue-600 hover:underline">
-            + Ajouter bagage
-          </button>
-          <div className="space-y-4">
-            {baggages.map((bag, i) => (
-              <div key={i} className="border rounded p-4">
-                <label className="block mb-1">Type</label>
-                <select
-                  className="w-full border rounded p-2 mb-3"
-                  value={bag.type}
-                  onChange={(e) => updateBaggage(i, 'type', e.target.value)}
-                >
-                  <option>Valise</option>
-                  <option>Sac</option>
-                  <option>Carton</option>
-                </select>
-                <label className="block mb-1">Dimensions (L x l x H)</label>
-                <input
-                  type="text"
-                  className="w-full border rounded p-2 mb-3"
-                  placeholder="50x30x20 cm"
-                  value={bag.dims}
-                  onChange={(e) => updateBaggage(i, 'dims', e.target.value)}
-                />
-                <label className="block mb-1">Poids</label>
-                <input
-                  type="range"
-                  min={0}
-                  max={50}
-                  className="w-full mb-3"
-                  value={bag.weight}
-                  onChange={(e) => updateBaggage(i, 'weight', Number(e.target.value))}
-                />
-                <label className="block mb-1">Photo</label>
-                <input type="file" className="w-full mb-3" />
-                <div className="flex space-x-4">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={bag.fragile}
-                      onChange={(e) => updateBaggage(i, 'fragile', e.target.checked)}
-                    />
-                    Fragile
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={bag.insured}
-                      onChange={(e) => updateBaggage(i, 'insured', e.target.checked)}
-                    />
-                    Valeur déclarée
-                  </label>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <>
+          <h3 className="text-xl font-semibold mb-4">Étape 2 : Bagages</h3>
+          <p className="italic text-gray-500">(À implémenter si besoin)</p>
+        </>
       )}
 
       {step === 3 && (
-        <div>
-          <h3 className="text-xl font-semibold mb-4">Étape 3 : Créneaux Horaires</h3>
-          <label className="block mb-1">Collecte (Madagascar)</label>
+        <>
+          <h3 className="text-xl font-semibold mb-4">Étape 3 : Horaires</h3>
+          <label className="block mb-1">Collecte</label>
           <input
             type="date"
             className="w-full border rounded p-2 mb-4"
             value={collectDate}
-            onChange={(e) => setCollectDate(e.target.value)}
+            onChange={e => setCollectDate(e.target.value)}
           />
-          <label className="block mb-1">Livraison (France)</label>
+          <label className="block mb-1">Livraison</label>
           <input
             type="date"
             className="w-full border rounded p-2"
             value={deliverDate}
-            onChange={(e) => setDeliverDate(e.target.value)}
+            onChange={e => setDeliverDate(e.target.value)}
           />
-        </div>
+        </>
       )}
 
       {step === 4 && (
-        <div>
+        <>
           <h3 className="text-xl font-semibold mb-4">Étape 4 : Coordonnées</h3>
-          <input
-            type="text"
-            placeholder="Adresse précise collecte"
-            className="w-full border rounded p-2 mb-3"
-          />
-          <input
-            type="text"
-            placeholder="Adresse livraison France"
-            className="w-full border rounded p-2 mb-3"
-          />
-          <input
-            type="text"
-            placeholder="Contact d'urgence"
-            className="w-full border rounded p-2"
-          />
-        </div>
+          <p className="italic text-gray-500">(À implémenter si besoin)</p>
+        </>
       )}
 
-      {/* Étape 5 : Paiement + QR */}
       {step === 5 && (
-        <div>
+        <>
           <h3 className="text-xl font-semibold mb-4">Étape 5 : Paiement</h3>
-          <button className="w-full bg-green-600 text-white py-2 rounded-lg mb-2">
-            Payer par carte (Stripe)
-          </button>
-          <button className="w-full bg-yellow-500 text-white py-2 rounded-lg mb-2">
-            Mobile Money
-          </button>
-          <button className="w-full bg-gray-700 text-white py-2 rounded-lg mb-4">
-            Virement
-          </button>
-          <label className="flex items-center space-x-2 mb-6">
-            <input type="checkbox" /> Ajouter Assurance bagage
-          </label>
+          {error && <p className="text-red-500 mb-4">{error}</p>}
 
-          {/* Bouton Terminer */}
-          <div className="flex justify-end">
-            <button
-              onClick={() => {
-               // Génération de la référence
-               const newRef = `CNG-${Date.now()}`
-               setReservationRef(newRef)
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="w-full bg-[#ffc80a] text-[#2c2c2c] py-2 rounded-lg font-semibold hover:bg-yellow-500 disabled:opacity-50"
+          >
+            {loading ? 'Chargement…' : 'Terminer et générer QR'}
+          </button>
 
-               // Envoi des données avec ref
-                onComplete({
-                  departure,
-                  arrival,
-                  collectDate,
-                  deliverDate,
-                  status,
-                ref: newRef,
-                })
-                setShowQR(true)
-              }}
-              className="bg-[#ffc80a] text-[#2c2c2c] px-4 py-2 rounded"
-            >
-              Terminer
-            </button>
-          </div>
-
-          {/* QR Code après validation */}
           {showQR && (
-            <div className="flex justify-center mt-6">
+            <div className="mt-6 flex flex-col items-center space-y-4">
+              <p className="font-medium">Réf : {reservationRef}</p>
               <QRCodeCanvas
                 value={JSON.stringify({
                   ref: reservationRef,
@@ -249,22 +186,26 @@ export default function ReservationForm({ onComplete }: Props) {
               />
             </div>
           )}
-        </div>
+        </>
       )}
 
-      {/* Barre de navigation */}
+      {/* Navigation */}
       <div className="flex justify-between mt-6">
         <button
           onClick={back}
-          disabled={step === 1}
+          disabled={step === 1 || loading}
           className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
         >
           ← Précédent
         </button>
         {step < 5 && (
           <button
-            onClick={next}
-            className="bg-[#ffc80a] text-[#2c2c2c] px-4 py-2 rounded"
+            onClick={() => {
+              setError('')
+              next()
+            }}
+            disabled={loading}
+            className="bg-[#ffc80a] text-[#2c2c2c] px-4 py-2 rounded hover:bg-yellow-500 disabled:opacity-50"
           >
             Suivant →
           </button>
